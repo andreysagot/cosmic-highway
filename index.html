@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Autopista Cósmica 3D - Experiencia Audiovisual Reactiva</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+    <div id="welcome-overlay">
+        <button id="audio-btn">Iniciar Experiencia</button>
+    </div>
+
+    <div class="btn-container" id="controls-container">
+        <label class="secondary-checkbox">
+            <input type="checkbox" id="highway-toggle" checked>
+            <span>Autopista</span>
+        </label>
+        <button class="secondary-btn" id="fs-fallback-btn">Pantalla Completa ⛶</button>
+    </div>
+
+    
+    <script type="module" src="./src/core/App.js"></script>
+
+</body>
+</html>
