@@ -3,6 +3,9 @@
  * @description Controlador de la interfaz de usuario, eventos del DOM y gestión del modo de pantalla completa.
  */
 
+import { createIcons } from 'lucide';
+import * as icons from 'lucide'; // Esto importa toda la librería como un objeto 'icons'
+
 export class UIManager {
   constructor(onAudioInitRequest, onToggleHighway) {
     this.audioBtn = document.getElementById('audio-btn');
@@ -94,19 +97,26 @@ export class UIManager {
   handleFullscreenChange() {
     if (!this.controls) return;
 
-    if (this.isFullscreen()) {
-      // Entrando a Fullscreen: iniciamos el timer para ocultar todo
-      this.startCursorHideTimer();
-    } else {
-      // Saliendo de Fullscreen: limpiamos timers y mostramos todo
-      clearTimeout(this.hideCursorTimer);
-      document.documentElement.style.cursor = '';
-      
-      if (this.isAudioInitialized) {
-        this.controls.style.opacity = '1';
-        this.controls.style.pointerEvents = 'auto';
-      }
-    }
+    const fsBtn = document.getElementById('fs-fallback-btn');
+    const span = fsBtn?.querySelector('span');
+    
+    // 1. ELIMINAR el icono viejo para asegurar un render fresco
+    const oldIcon = fsBtn?.querySelector('i, svg');
+    if (oldIcon) oldIcon.remove();
+
+    // 2. CREAR un nuevo elemento <i> para el nuevo icono
+    const newIcon = document.createElement('i');
+    newIcon.setAttribute('data-lucide', this.isFullscreen() ? 'shrink' : 'expand');
+    fsBtn.prepend(newIcon); // Lo ponemos al principio del botón
+
+    // 3. Actualizar texto
+    if (span) span.textContent = this.isFullscreen() ? '' : '';
+
+    // 4. Renderizar iconos
+    createIcons({
+      icons, // El objeto que importamos como * as icons
+      attrs: { 'stroke-width': 2 }
+    });
   }
 
   startCursorHideTimer() {
