@@ -24,24 +24,27 @@ El proyecto sigue un patrón de diseño limpio, separando la lógica de la CPU, 
 
 ```text
 ├── src/
+│   ├── audio/
+│   │   └── AudioManager.js       # Web Audio API, analizador FFT y suavizado (ADSR)
 │   ├── config/
-│   │   └── AppConfig.js          # Ajustes físicos, límites de renderizado y configuración FFT
+│   │   └── AppConfig.js          # Ajustes físicos y configuración FFT
 │   ├── core/
-│   │   ├── Engine.js             # Inicialización WebGL, luces, ResizeObserver y Throttling
-│   │   ├── EntityManager.js      # Orquestador del ciclo de vida de los modelos 3D
+│   │   ├── Engine.js             # Inicialización WebGL y bucles de renderizado
+│   │   ├── EntityManager.js      # Orquestador del ciclo de vida de modelos 3D
 │   │   └── index.js              # Barril de exportaciones del núcleo
 │   ├── entities/
 │   │   ├── AudioHighway.js       # Matriz polar reactiva del túnel principal
-│   │   ├── Stars.js              # Enjambre de partículas con destellos cinemáticos
-│   │   ├── BlackHole.js          # Agujero negro masivo con disco de acreción
+│   │   ├── Stars.js              # Enjambre de partículas cinemáticas
+│   │   ├── BlackHole.js          # Agujero negro y lente gravitacional
 │   │   └── index.js              # Barril de exportaciones de entidades
-│   ├── audio/
-│   │   └── AudioManager.js       # Web Audio API, analizador FFT y suavizado (ADSR)
+│   ├── shaders/                  # Lógica de renderizado en GPU (GLSL)
+│   │   ├── tunnel.vertex.js      # Deformación de vértices del túnel
+│   │   └── tunnel.fragment.js    # Coloreado y efectos de plasma
 │   ├── ui/
-│   │   └── UIManager.js          # Gestión del DOM, overlays y modo Fullscreen nativo
+│   │   └── UIManager.js          # Gestión del DOM, overlays y Fullscreen
 │   ├── utils/
-│   │   └── MathUtils.js          # Funciones de utilidad pura (Clamp, Lerp, Smoothstep)
-│   └── App.js                    # Bucle principal (Render Loop) y punto de entrada
+│   │   └── MathUtils.js          # Funciones de utilidad pura
+│   └── App.js                    # Punto de entrada y orquestador principal
 ├── index.html                    # Lienzo DOM y punto de entrada para Vite
 ├── style.css                     # Estilos UI / Reset global sin scroll
 └── package.json                  # Dependencias y scripts de empaquetado
