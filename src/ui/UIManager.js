@@ -84,14 +84,25 @@ export class UIManager {
 
   handleFullscreenChange() {
     const controls = document.getElementById('controls-container');
+    
+    if (!controls) return;
+
+    // Aseguramos que el elemento tenga una transición suave
+    controls.style.transition = 'opacity 0.3s ease-in-out';
+
     if (this.isFullscreen()) {
-      if (controls) controls.classList.remove('visible');
+      // Modo pantalla completa: ocultar controles
+      controls.style.opacity = '0';
+      controls.style.pointerEvents = 'none'; // Evita que se pueda clickear por error
       this.startCursorHideTimer();
     } else {
+      // Modo ventana: mostrar controles
       clearTimeout(this.hideCursorTimer);
       document.documentElement.style.cursor = '';
-      if (this.isAudioInitialized && controls) {
-        controls.classList.add('visible');
+      
+      if (this.isAudioInitialized) {
+        controls.style.opacity = '1';
+        controls.style.pointerEvents = 'auto';
       }
     }
   }
