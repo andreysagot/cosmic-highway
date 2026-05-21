@@ -7,94 +7,94 @@ import * as THREE from 'three';
 
 export class BlackHole {
   constructor(scene) {
-    this.bhRadius = 27; //
-    this.blackHoleDistance = 4000.0; //
-    this.blackHoleScaleFactor = this.blackHoleDistance / 1200.0; //
-    this.einsteinRadiusScaled = 34.5 * this.blackHoleScaleFactor; //
-    this.blackHoleTiltX = 0.18; //
+    this.bhRadius = 27;
+    this.blackHoleDistance = 4000.0;
+    this.blackHoleScaleFactor = this.blackHoleDistance / 1200.0;
+    this.einsteinRadiusScaled = 34.5 * this.blackHoleScaleFactor;
+    this.blackHoleTiltX = 0.18;
     
     // Variables de caché para vectores locales
-    this.localCamPos = new THREE.Vector3(); //
-    this.bhViewDir = new THREE.Vector3(); //
+    this.localCamPos = new THREE.Vector3();
+    this.bhViewDir = new THREE.Vector3();
     
     this.initSphereAndHalo(scene);
     this.initAccretionDisk(scene);
   }
 
   initSphereAndHalo(scene) {
-    const bhGeometry = new THREE.SphereGeometry(this.bhRadius * this.blackHoleScaleFactor, 64, 64); // [cite: 133]
-    const bhMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: false, depthWrite: true, depthTest: true }); // [cite: 134]
-    this.blackHole = new THREE.Mesh(bhGeometry, bhMaterial); // [cite: 135]
-    this.blackHole.renderOrder = -1; // [cite: 135]
-    scene.add(this.blackHole); // [cite: 135]
+    const bhGeometry = new THREE.SphereGeometry(this.bhRadius * this.blackHoleScaleFactor, 64, 64);
+    const bhMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: false, depthWrite: true, depthTest: true });
+    this.blackHole = new THREE.Mesh(bhGeometry, bhMaterial);
+    this.blackHole.renderOrder = -1;
+    scene.add(this.blackHole);
 
-    const haloGeo = new THREE.SphereGeometry(this.bhRadius * this.blackHoleScaleFactor, 64, 64); // [cite: 138]
+    const haloGeo = new THREE.SphereGeometry(this.bhRadius * this.blackHoleScaleFactor, 64, 64);
     const haloMat = new THREE.ShaderMaterial({
-      uniforms: { uGrosor: { value: 1.2 * this.blackHoleScaleFactor } }, // [cite: 149]
-      vertexShader: `uniform float uGrosor; varying vec3 vNormal; void main() { vNormal = normalize(normalMatrix * normal); vec3 posAmpliada = position + normal * uGrosor; gl_Position = projectionMatrix * modelViewMatrix * vec4(posAmpliada, 1.0); }`, // [cite: 138]
-      fragmentShader: `varying vec3 vNormal; void main() { float perfil = 1.0 - abs(vNormal.z); float anilloNitido = smoothstep(0.3, 0.5, perfil); gl_FragColor = vec4(vec3(1.5, 1.5, 1.4) * anilloNitido, anilloNitido); }`, // [cite: 144]
-      transparent: true, blending: THREE.AdditiveBlending, side: THREE.BackSide, depthWrite: false, depthTest: true // [cite: 149]
+      uniforms: { uGrosor: { value: 1.2 * this.blackHoleScaleFactor } },
+      vertexShader: `uniform float uGrosor; varying vec3 vNormal; void main() { vNormal = normalize(normalMatrix * normal); vec3 posAmpliada = position + normal * uGrosor; gl_Position = projectionMatrix * modelViewMatrix * vec4(posAmpliada, 1.0); }`,
+      fragmentShader: `varying vec3 vNormal; void main() { float perfil = 1.0 - abs(vNormal.z); float anilloNitido = smoothstep(0.3, 0.5, perfil); gl_FragColor = vec4(vec3(1.5, 1.5, 1.4) * anilloNitido, anilloNitido); }`,
+      transparent: true, blending: THREE.AdditiveBlending, side: THREE.BackSide, depthWrite: false, depthTest: true
     });
-    this.blackHoleHalo = new THREE.Mesh(haloGeo, haloMat); // [cite: 151]
-    this.blackHoleHalo.renderOrder = 0; // [cite: 151]
-    this.blackHole.add(this.blackHoleHalo); // [cite: 152]
+    this.blackHoleHalo = new THREE.Mesh(haloGeo, haloMat);
+    this.blackHoleHalo.renderOrder = 0;
+    this.blackHole.add(this.blackHoleHalo);
   }
 
   initAccretionDisk(scene) {
-    const TOTAL_PARTICLES_ACC = 40000; // [cite: 153]
-    const accGeometry = new THREE.BufferGeometry(); // [cite: 153]
-    const accStaticPositions = new Float32Array(TOTAL_PARTICLES_ACC * 2 * 3); // [cite: 154]
-    const accColors = new Float32Array(TOTAL_PARTICLES_ACC * 2 * 3); // [cite: 154]
-    const accSizes = new Float32Array(TOTAL_PARTICLES_ACC * 2); // [cite: 155]
-    const accPhysicsData = new Float32Array(TOTAL_PARTICLES_ACC * 2 * 3); // [cite: 155]
-    const accSecondary = new Float32Array(TOTAL_PARTICLES_ACC * 2); // [cite: 156]
-    const accVariation = new Float32Array(TOTAL_PARTICLES_ACC * 2 * 4); // [cite: 156]
+    const TOTAL_PARTICLES_ACC = 40000;
+    const accGeometry = new THREE.BufferGeometry();
+    const accStaticPositions = new Float32Array(TOTAL_PARTICLES_ACC * 2 * 3);
+    const accColors = new Float32Array(TOTAL_PARTICLES_ACC * 2 * 3);
+    const accSizes = new Float32Array(TOTAL_PARTICLES_ACC * 2);
+    const accPhysicsData = new Float32Array(TOTAL_PARTICLES_ACC * 2 * 3);
+    const accSecondary = new Float32Array(TOTAL_PARTICLES_ACC * 2);
+    const accVariation = new Float32Array(TOTAL_PARTICLES_ACC * 2 * 4);
     
-    const colorCore = new THREE.Color(0xffffff); const colorMid = new THREE.Color(0xff8822); const colorOuter = new THREE.Color(0x550800); const tempColorAcc = new THREE.Color(); // [cite: 157]
-    const mixAcc = (start, end, amt) => (1 - amt) * start + amt * end; // [cite: 158]
+    const colorCore = new THREE.Color(0xffffff); const colorMid = new THREE.Color(0xff8822); const colorOuter = new THREE.Color(0x550800); const tempColorAcc = new THREE.Color();
+    const mixAcc = (start, end, amt) => (1 - amt) * start + amt * end;
 
     for (let i = 0; i < TOTAL_PARTICLES_ACC; i++) {
-      const normalizedBand = Math.random(); // [cite: 159]
-      const r = (this.bhRadius * 1.4 * this.blackHoleScaleFactor) + Math.pow(normalizedBand, 4.5) * (320.0 * this.blackHoleScaleFactor); // [cite: 160]
-      const angle = Math.random() * Math.PI * 2; // [cite: 161]
-      const thickness = 0.04 * (r * 0.1); // [cite: 161]
-      const yOff = (Math.random() - 0.5) * thickness; // [cite: 162]
-      const sizeBase = (mixAcc(1.5, 4.5, 1.0 - normalizedBand) + Math.random() * 1.0) * this.blackHoleScaleFactor; // [cite: 162]
+      const normalizedBand = Math.random();
+      const r = (this.bhRadius * 1.4 * this.blackHoleScaleFactor) + Math.pow(normalizedBand, 4.5) * (320.0 * this.blackHoleScaleFactor);
+      const angle = Math.random() * Math.PI * 2;
+      const thickness = 0.04 * (r * 0.1);
+      const yOff = (Math.random() - 0.5) * thickness;
+      const sizeBase = (mixAcc(1.5, 4.5, 1.0 - normalizedBand) + Math.random() * 1.0) * this.blackHoleScaleFactor;
       
-      if (normalizedBand < 0.28) tempColorAcc.lerpColors(colorCore, colorMid, normalizedBand / 0.28); // [cite: 163]
-      else tempColorAcc.lerpColors(colorMid, colorOuter, (normalizedBand - 0.28) / 0.72); // [cite: 164]
+      if (normalizedBand < 0.28) tempColorAcc.lerpColors(colorCore, colorMid, normalizedBand / 0.28);
+      else tempColorAcc.lerpColors(colorMid, colorOuter, (normalizedBand - 0.28) / 0.72);
 
-      const distanceFade = 1.0 - Math.pow(Math.min(1.0, Math.max(0.0, (r - this.bhRadius * 1.4 * this.blackHoleScaleFactor) / (320.0 * this.blackHoleScaleFactor))), 2.0); // [cite: 165]
-      const rColor = tempColorAcc.r * distanceFade, gColor = tempColorAcc.g * distanceFade, bColor = tempColorAcc.b * distanceFade; // [cite: 166]
-      const posX = Math.cos(angle) * r, posY = yOff, posZ = Math.sin(angle) * r; // [cite: 167]
+      const distanceFade = 1.0 - Math.pow(Math.min(1.0, Math.max(0.0, (r - this.bhRadius * 1.4 * this.blackHoleScaleFactor) / (320.0 * this.blackHoleScaleFactor))), 2.0);
+      const rColor = tempColorAcc.r * distanceFade, gColor = tempColorAcc.g * distanceFade, bColor = tempColorAcc.b * distanceFade;
+      const posX = Math.cos(angle) * r, posY = yOff, posZ = Math.sin(angle) * r;
       
-      const idx1 = i * 2, idx2 = i * 2 + 1; // [cite: 168]
-      const turbulencePhase = Math.random() * Math.PI * 2.0, turbulenceAmp = 0.35 + Math.random() * 0.65; // [cite: 169]
-      const flickerPhase = Math.random() * Math.PI * 2.0, radialPhase = Math.random() * Math.PI * 2.0; // [cite: 170]
+      const idx1 = i * 2, idx2 = i * 2 + 1;
+      const turbulencePhase = Math.random() * Math.PI * 2.0, turbulenceAmp = 0.35 + Math.random() * 0.65;
+      const flickerPhase = Math.random() * Math.PI * 2.0, radialPhase = Math.random() * Math.PI * 2.0;
 
       // Primary
-      accPhysicsData[idx1 * 3] = r; accPhysicsData[idx1 * 3 + 1] = angle; accPhysicsData[idx1 * 3 + 2] = yOff; // [cite: 171]
-      accStaticPositions[idx1 * 3] = posX; accStaticPositions[idx1 * 3 + 1] = posY; accStaticPositions[idx1 * 3 + 2] = posZ; // [cite: 172]
-      accSizes[idx1] = sizeBase; accColors[idx1 * 3] = rColor; accColors[idx1 * 3 + 1] = gColor; accColors[idx1 * 3 + 2] = bColor; // [cite: 174]
-      accSecondary[idx1] = 0.0; accVariation[idx1 * 4] = turbulencePhase; accVariation[idx1 * 4 + 1] = turbulenceAmp; accVariation[idx1 * 4 + 2] = flickerPhase; accVariation[idx1 * 4 + 3] = radialPhase; // [cite: 175]
+      accPhysicsData[idx1 * 3] = r; accPhysicsData[idx1 * 3 + 1] = angle; accPhysicsData[idx1 * 3 + 2] = yOff;
+      accStaticPositions[idx1 * 3] = posX; accStaticPositions[idx1 * 3 + 1] = posY; accStaticPositions[idx1 * 3 + 2] = posZ;
+      accSizes[idx1] = sizeBase; accColors[idx1 * 3] = rColor; accColors[idx1 * 3 + 1] = gColor; accColors[idx1 * 3 + 2] = bColor;
+      accSecondary[idx1] = 0.0; accVariation[idx1 * 4] = turbulencePhase; accVariation[idx1 * 4 + 1] = turbulenceAmp; accVariation[idx1 * 4 + 2] = flickerPhase; accVariation[idx1 * 4 + 3] = radialPhase;
 
       // Secondary
-      accPhysicsData[idx2 * 3] = r; accPhysicsData[idx2 * 3 + 1] = angle; accPhysicsData[idx2 * 3 + 2] = yOff; // [cite: 177]
-      accStaticPositions[idx2 * 3] = posX; accStaticPositions[idx2 * 3 + 1] = posY; accStaticPositions[idx2 * 3 + 2] = posZ; // [cite: 179]
-      accSizes[idx2] = sizeBase; accColors[idx2 * 3] = rColor; accColors[idx2 * 3 + 1] = gColor; accColors[idx2 * 3 + 2] = bColor; // [cite: 180]
-      accSecondary[idx2] = 1.0; accVariation[idx2 * 4] = turbulencePhase + 1.73; accVariation[idx2 * 4 + 1] = turbulenceAmp; accVariation[idx2 * 4 + 2] = flickerPhase + 0.91; accVariation[idx2 * 4 + 3] = radialPhase + 2.41; // [cite: 181]
+      accPhysicsData[idx2 * 3] = r; accPhysicsData[idx2 * 3 + 1] = angle; accPhysicsData[idx2 * 3 + 2] = yOff;
+      accStaticPositions[idx2 * 3] = posX; accStaticPositions[idx2 * 3 + 1] = posY; accStaticPositions[idx2 * 3 + 2] = posZ;
+      accSizes[idx2] = sizeBase; accColors[idx2 * 3] = rColor; accColors[idx2 * 3 + 1] = gColor; accColors[idx2 * 3 + 2] = bColor;
+      accSecondary[idx2] = 1.0; accVariation[idx2 * 4] = turbulencePhase + 1.73; accVariation[idx2 * 4 + 1] = turbulenceAmp; accVariation[idx2 * 4 + 2] = flickerPhase + 0.91; accVariation[idx2 * 4 + 3] = radialPhase + 2.41;
     }
 
-    accGeometry.setAttribute('position', new THREE.BufferAttribute(accStaticPositions, 3)); // [cite: 184]
-    accGeometry.setAttribute('color', new THREE.BufferAttribute(accColors, 3)); // [cite: 184]
-    accGeometry.setAttribute('aSize', new THREE.BufferAttribute(accSizes, 1)); // [cite: 184]
-    accGeometry.setAttribute('aPhysics', new THREE.BufferAttribute(accPhysicsData, 3)); // [cite: 184]
-    accGeometry.setAttribute('aIsSecondary', new THREE.BufferAttribute(accSecondary, 1)); // [cite: 184]
-    accGeometry.setAttribute('aVariation', new THREE.BufferAttribute(accVariation, 4)); // [cite: 185]
+    accGeometry.setAttribute('position', new THREE.BufferAttribute(accStaticPositions, 3));
+    accGeometry.setAttribute('color', new THREE.BufferAttribute(accColors, 3));
+    accGeometry.setAttribute('aSize', new THREE.BufferAttribute(accSizes, 1));
+    accGeometry.setAttribute('aPhysics', new THREE.BufferAttribute(accPhysicsData, 3));
+    accGeometry.setAttribute('aIsSecondary', new THREE.BufferAttribute(accSecondary, 1));
+    accGeometry.setAttribute('aVariation', new THREE.BufferAttribute(accVariation, 4));
 
     this.accMaterial = new THREE.ShaderMaterial({
-      uniforms: { uTime: { value: 0.0 }, uCameraPosition: { value: new THREE.Vector3() }, uViewDir: { value: new THREE.Vector3(0, 0, 1) }, uDiskTiltX: { value: this.blackHoleTiltX } }, // [cite: 185]
-      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, vertexColors: true, // [cite: 233]
+      uniforms: { uTime: { value: 0.0 }, uCameraPosition: { value: new THREE.Vector3() }, uViewDir: { value: new THREE.Vector3(0, 0, 1) }, uDiskTiltX: { value: this.blackHoleTiltX } },
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, vertexColors: true,
       vertexShader: `
         attribute float aSize; attribute vec3 aPhysics; attribute float aIsSecondary; attribute vec4 aVariation;
         varying vec3 vColor; varying float vBehindFactor; varying float vDopplerFactor; varying float vHeatFlicker; varying float vRadialFade;
@@ -139,7 +139,7 @@ export class BlackHole {
           vec4 viewPos = modelViewMatrix * vec4(finalWorldPos, 1.0); float distanceScale = 1450.0 / (-viewPos.z + 1.0);
           float finalSize = aSize * distanceScale * mix(0.75, 1.25, vDopplerFactor); gl_PointSize = clamp(finalSize, 0.6, 48.0); gl_Position = projectionMatrix * viewPos;
         }
-      `, // [cite: 185]
+      `,
       fragmentShader: `
         varying vec3 vColor; varying float vBehindFactor; varying float vDopplerFactor; varying float vHeatFlicker; varying float vRadialFade;
         void main() {
@@ -149,26 +149,26 @@ export class BlackHole {
           float depthAlpha = mix(0.15, 0.40, vBehindFactor); float radialAlpha = mix(0.45, 1.0, vRadialFade); float opacityAlpha = depthAlpha * vDopplerFactor * radialAlpha * vHeatFlicker;
           vec3 finalColor = vColor * (0.90 + halo * 0.25 + core * 0.25); gl_FragColor = vec4(finalColor * glow, clamp(glow * opacityAlpha * 0.32, 0.0, 1.0));
         }
-      ` // [cite: 224]
+      `
     });
-    this.accretionPoints = new THREE.Points(accGeometry, this.accMaterial); // [cite: 234]
-    this.accretionPoints.renderOrder = 0; // [cite: 234]
-    scene.add(this.accretionPoints); // [cite: 234]
+    this.accretionPoints = new THREE.Points(accGeometry, this.accMaterial);
+    this.accretionPoints.renderOrder = 0;
+    scene.add(this.accretionPoints);
     
-    this.localCamPos = new THREE.Vector3(); // [cite: 238]
-    this.bhViewDir = new THREE.Vector3(); // [cite: 239]
+    this.localCamPos = new THREE.Vector3();
+    this.bhViewDir = new THREE.Vector3();
   }
   
   update(state, currentCamPos) {
-    this.accMaterial.uniforms.uTime.value = state.timeAccumulator; //
-    this.blackHole.position.set(0, 120, state.worldTravel - this.blackHoleDistance); //
-    this.accretionPoints.position.copy(this.blackHole.position); //
+    this.accMaterial.uniforms.uTime.value = state.timeAccumulator;
+    this.blackHole.position.set(0, 120, state.worldTravel - this.blackHoleDistance);
+    this.accretionPoints.position.copy(this.blackHole.position);
     this.accretionPoints.rotation.z = 0.5;
 
-    this.localCamPos.copy(currentCamPos).sub(this.blackHole.position); //
-    this.bhViewDir.copy(this.localCamPos).normalize(); //
+    this.localCamPos.copy(currentCamPos).sub(this.blackHole.position);
+    this.bhViewDir.copy(this.localCamPos).normalize();
 
-    this.accMaterial.uniforms.uCameraPosition.value.copy(this.localCamPos); //
-    this.accMaterial.uniforms.uViewDir.value.copy(this.bhViewDir); //
+    this.accMaterial.uniforms.uCameraPosition.value.copy(this.localCamPos);
+    this.accMaterial.uniforms.uViewDir.value.copy(this.bhViewDir);
   }
 }
