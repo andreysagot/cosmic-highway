@@ -68,15 +68,7 @@ canvas {
     right: 20px;
     z-index: 90;
     display: flex;       
-    gap: 10px;           
-    opacity: 0;          
-    visibility: hidden;
-    transition: opacity 0.3s ease;
-}
-
-.btn-container.visible {
-    opacity: 1;
-    visibility: visible;
+    gap: 10px;
 }
 
 /* Estilo base para ambos botones */

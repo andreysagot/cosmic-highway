@@ -9,6 +9,12 @@ export class UIManager {
     this.welcomeOverlay = document.getElementById('welcome-overlay');
     this.fsFallbackBtn = document.getElementById('fs-fallback-btn');
     this.highwayToggle = document.getElementById('highway-toggle');
+    this.controls = document.getElementById('controls-container');
+
+    if (this.controls) {
+      this.controls.style.opacity = '1'; // Inician visibles
+      this.controls.style.transition = 'opacity 0.5s ease-in-out'; // Transición suave
+    }
     
     this.hideCursorTimer = null;
     this.onAudioInitRequest = onAudioInitRequest;
@@ -74,11 +80,14 @@ export class UIManager {
   }
 
   forceFullscreen() {
-    const docEl = document.documentElement;
-    if (docEl.requestFullscreen) {
-      docEl.requestFullscreen().catch(e => console.warn("Fullscreen error:", e));
-    } else if (docEl.webkitRequestFullscreen) {
-      docEl.webkitRequestFullscreen();
+    if (!this.isFullscreen()) {
+      const docEl = document.documentElement;
+      if (docEl.requestFullscreen) docEl.requestFullscreen();
+      else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+    } else {
+      // Si ya estamos en pantalla completa, salimos
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
     }
   }
 
@@ -103,22 +112,20 @@ export class UIManager {
   startCursorHideTimer() {
     const fsEl = document.documentElement;
     
-    // 1. Mostrar controles y cursor al mover el mouse
-    fsEl.style.cursor = '';
+    // 1. Siempre mostrar al mover el mouse
+    fsEl.style.cursor = 'default'; // Restaurar cursor
     if (this.controls) {
       this.controls.style.opacity = '1';
       this.controls.style.pointerEvents = 'auto';
     }
     
-    // 2. Limpiar timer previo
+    // 2. Limpiar timer previo para evitar conflictos
     clearTimeout(this.hideCursorTimer);
     
-    // 3. Crear nuevo timer de 2 segundos
+    // 3. Iniciar nuevo ciclo de 2 segundos
     this.hideCursorTimer = setTimeout(() => {
       if (this.isFullscreen()) {
-        // Ocultar cursor
-        fsEl.style.cursor = 'none';
-        // Ocultar controles
+        fsEl.style.cursor = 'none'; // Ocultar cursor
         if (this.controls) {
           this.controls.style.opacity = '0';
           this.controls.style.pointerEvents = 'none';
