@@ -83,36 +83,47 @@ export class UIManager {
   }
 
   handleFullscreenChange() {
-    const controls = document.getElementById('controls-container');
-    
-    if (!controls) return;
-
-    // Aseguramos que el elemento tenga una transición suave
-    controls.style.transition = 'opacity 0.3s ease-in-out';
+    if (!this.controls) return;
 
     if (this.isFullscreen()) {
-      // Modo pantalla completa: ocultar controles
-      controls.style.opacity = '0';
-      controls.style.pointerEvents = 'none'; // Evita que se pueda clickear por error
+      // Entrando a Fullscreen: iniciamos el timer para ocultar todo
       this.startCursorHideTimer();
     } else {
-      // Modo ventana: mostrar controles
+      // Saliendo de Fullscreen: limpiamos timers y mostramos todo
       clearTimeout(this.hideCursorTimer);
       document.documentElement.style.cursor = '';
       
       if (this.isAudioInitialized) {
-        controls.style.opacity = '1';
-        controls.style.pointerEvents = 'auto';
+        this.controls.style.opacity = '1';
+        this.controls.style.pointerEvents = 'auto';
       }
     }
   }
 
   startCursorHideTimer() {
     const fsEl = document.documentElement;
+    
+    // 1. Mostrar controles y cursor al mover el mouse
     fsEl.style.cursor = '';
+    if (this.controls) {
+      this.controls.style.opacity = '1';
+      this.controls.style.pointerEvents = 'auto';
+    }
+    
+    // 2. Limpiar timer previo
     clearTimeout(this.hideCursorTimer);
+    
+    // 3. Crear nuevo timer de 2 segundos
     this.hideCursorTimer = setTimeout(() => {
-      if (this.isFullscreen()) fsEl.style.cursor = 'none';
+      if (this.isFullscreen()) {
+        // Ocultar cursor
+        fsEl.style.cursor = 'none';
+        // Ocultar controles
+        if (this.controls) {
+          this.controls.style.opacity = '0';
+          this.controls.style.pointerEvents = 'none';
+        }
+      }
     }, 2000);
   }
 }
