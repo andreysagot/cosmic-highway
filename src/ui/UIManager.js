@@ -19,6 +19,7 @@ export class UIManager {
       this.controls.style.transition = 'opacity 0.5s ease-in-out'; // Transición suave
     }
     
+    this.wakeLock = null;
     this.hideCursorTimer = null;
     this.onAudioInitRequest = onAudioInitRequest;
     
@@ -82,15 +83,41 @@ export class UIManager {
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
   }
 
-  forceFullscreen() {
+  // Solicitar bloqueo de pantalla
+  async requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        this.wakeLock = await navigator.wakeLock.request('screen');
+        console.log('Wake Lock activo: Pantalla encendida');
+      }
+    } catch (err) {
+      console.error(`Error al activar Wake Lock: ${err.name}, ${err.message}`);
+    }
+  }
+
+  // Liberar bloqueo de pantalla
+  async releaseWakeLock() {
+    if (this.wakeLock !== null) {
+      await this.wakeLock.release();
+      this.wakeLock = null;
+      console.log('Wake Lock liberado');
+    }
+  }
+
+  async forceFullscreen() {
     if (!this.isFullscreen()) {
+      // ENTRANDO: Solicitamos Wake Lock primero
+      await this.requestWakeLock();
+      
       const docEl = document.documentElement;
-      if (docEl.requestFullscreen) docEl.requestFullscreen();
-      else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+      if (docEl.requestFullscreen) await docEl.requestFullscreen();
+      else if (docEl.webkitRequestFullscreen) await docEl.webkitRequestFullscreen();
     } else {
-      // Si ya estamos en pantalla completa, salimos
-      if (document.exitFullscreen) document.exitFullscreen();
-      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      // SALIENDO: Liberamos Wake Lock
+      await this.releaseWakeLock();
+      
+      if (document.exitFullscreen) await document.exitFullscreen();
+      else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
     }
   }
 
