@@ -105,19 +105,29 @@ export class UIManager {
   }
 
   async forceFullscreen() {
-    if (!this.isFullscreen()) {
-      // ENTRANDO: Solicitamos Wake Lock primero
-      await this.requestWakeLock();
-      
-      const docEl = document.documentElement;
-      if (docEl.requestFullscreen) await docEl.requestFullscreen();
-      else if (docEl.webkitRequestFullscreen) await docEl.webkitRequestFullscreen();
+    const isCurrentlyFullscreen = this.isFullscreen();
+    if (!isCurrentlyFullscreen) {
+      // 1. Intentamos entrar
+      try {
+        await this.requestWakeLock();
+        const docEl = document.documentElement;
+        
+        if (docEl.requestFullscreen) await docEl.requestFullscreen();
+        else if (docEl.webkitRequestFullscreen) await docEl.webkitRequestFullscreen();
+        
+      } catch (err) {
+        // Si falló (por ejemplo, el usuario canceló o el navegador no dejó), 
+        // liberamos el Wake Lock inmediatamente para no dejarlo bloqueado
+        console.error("Fallo al entrar en fullscreen:", err);
+        await this.releaseWakeLock();
+      }
     } else {
-      // SALIENDO: Liberamos Wake Lock
-      await this.releaseWakeLock();
-      
+      // 2. Salimos (esto es más seguro porque exitFullscreen siempre debería funcionar)
       if (document.exitFullscreen) await document.exitFullscreen();
       else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+      
+      // Liberamos el Wake Lock justo al salir
+      await this.releaseWakeLock();
     }
   }
 
