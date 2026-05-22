@@ -176,7 +176,7 @@ export class UIManager {
     iconTag.setAttribute('data-lucide', isFS ? 'shrink' : 'expand');
     
     // 4. Restaurar el texto (¡importante!)
-    if (span) span.textContent = isFS ? 'Salir' : 'Fullscreen';
+    if (span) span.textContent = isFS ? '' : '';
 
     // 5. Renderizar iconos
     createIcons({
