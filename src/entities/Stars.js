@@ -3,6 +3,8 @@
  * @description Generador cinemático de fondo estelar con shaders orientados a difracción telescópica (Spikes JWST).
  */
 import * as THREE from 'three';
+import { StarsVertexShader } from '../shaders/stars.vertex.js';
+import { StarsFragmentShader } from '../shaders/stars.fragment.js';
 
 export class Stars {
   constructor(scene) {
@@ -105,10 +107,10 @@ export class Stars {
     this.starIDs[i] = i; 
   }
 
-  // Fragment Shader interno mantenido para portabilidad, 
-  // pero preparado para exportación.
   initGeometry(scene) {
     this.geometry = new THREE.BufferGeometry();
+    
+    // Configuración de atributos
     this.positionAttr = new THREE.BufferAttribute(this.starPositions, 3);
     this.positionAttr.setUsage(THREE.DynamicDrawUsage);
     
@@ -118,7 +120,7 @@ export class Stars {
     this.geometry.setAttribute('aStarID', new THREE.BufferAttribute(this.starIDs, 1));
     this.geometry.setAttribute('aStarType', new THREE.BufferAttribute(this.starTypes, 1));
 
-    // Se asume que VertexShader y FragmentShader se cargan limpia y estéticamente
+    // Material limpio que referencia a los shaders externos
     this.material = new THREE.ShaderMaterial({
       uniforms: { 
         uTime: { value: 0.0 }, 
@@ -128,148 +130,13 @@ export class Stars {
         uFlashProgress: { value: 0.0 }, 
         uExplosionType: { value: -1.0 } 
       },
+      vertexShader: StarsVertexShader,
+      fragmentShader: StarsFragmentShader,
       fog: false,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      vertexColors: true,
-      vertexShader: `
-        attribute float aSize; 
-        attribute float aStarID; 
-        attribute float aStarType;
-        uniform float uTime; 
-        uniform float uCamZ; 
-        uniform float uStarLength; 
-        uniform float uWinningID; 
-        uniform float uFlashProgress;
-        
-        varying vec3 vColor; 
-        varying float vTwinklePhase; 
-        varying float vFade; 
-        varying float vFlare; 
-        varying float vStarType; 
-        varying float vIsChosen;
-        varying float vBaseSize;
-        varying float vIsBlue;
-        
-        float hash(float n) { return fract(sin(n) * 43758.5453123); }
-        
-        void main() {
-          vColor = color; 
-          vStarType = aStarType; 
-          vBaseSize = aSize;
-          vTwinklePhase = hash(position.x + position.y + position.z) * 6.2831;
-          
-          vIsBlue = step(0.1, color.b - color.r);
-          float isChosen = step(abs(aStarID - uWinningID), 0.1); 
-          vIsChosen = isChosen;
-          
-          float sizeMultiplier = 1.0;
-          if (isChosen > 0.5) { 
-            if (aStarType < 0.5) sizeMultiplier = 1.6; 
-            else if (aStarType < 1.5) sizeMultiplier = 1.3; 
-            else sizeMultiplier = 2.2; 
-          }
-          vFlare = uFlashProgress * isChosen;
-          
-          float distToSpawn = abs(position.z - (uCamZ - uStarLength)); 
-          vFade = clamp(distToSpawn / 350.0, 0.0, 1.0);
-          
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          float distanceScale = 1400.0 / (-mvPosition.z + 200.0);
-          
-          float finalSize = aSize * distanceScale * mix(1.0, sizeMultiplier, uFlashProgress);
-          
-          // Suelo de renderizado a 4.5 píxeles para conservar nitidez en estrellas tipo M lejanas
-          gl_PointSize = clamp(finalSize, 4.5, 160.0); 
-          gl_Position = projectionMatrix * mvPosition;
-        }
-      `,
-      fragmentShader: `
-        uniform float uTime; 
-        uniform float uFlashProgress;
-        
-        varying vec3 vColor; 
-        varying float vTwinklePhase; 
-        varying float vFade; 
-        varying float vFlare; 
-        varying float vStarType; 
-        varying float vIsChosen;
-        varying float vBaseSize;
-        varying float vIsBlue;
-
-        void main() {
-          vec2 uv = gl_PointCoord - vec2(0.5);
-          float distSq = dot(uv, uv); 
-          
-          if (distSq > 0.25) discard;
-          
-          float dist = sqrt(distSq);
-          float isRed = 1.0 - vIsBlue; 
-
-          float dynamicEdge = mix(0.25, 0.42, vFlare); 
-          float edgeFade = smoothstep(0.5, dynamicEdge, dist);
-          
-          float intensityBoost = mix(0.90, 1.0, vIsBlue);
-
-          float coreDensity = mix(16.0, mix(8.0, 12.0, step(1.5, vStarType)), vFlare);
-          float core = exp(-dist * coreDensity) * intensityBoost;
-          float superCore = exp(-dist * 60.0) * 1.5;
-
-          float intensity = core + superCore;
-
-          if (vBaseSize > 40.0 || vIsChosen > 0.5) {
-            float sizeFactor = clamp((vBaseSize - 30.0) / 130.0, 0.0, 1.0);
-            float spikeWidth = mix(65.0, 40.0, sizeFactor); 
-            float spikeLength = mix(3.5, 2.0, sizeFactor);
-            
-            if (vIsChosen > 0.5 && vStarType > 0.5 && vStarType < 1.5) { 
-              spikeWidth = 35.0; 
-              spikeLength = 1.2; 
-            }
-
-            const float COS_60 = 0.5; 
-            const float SIN_60 = 0.866025;
-
-            float spikeVert = exp(-(abs(uv.x) * spikeWidth + abs(uv.y) * spikeLength));
-
-            vec2 uv60 = vec2(uv.x * COS_60 - uv.y * SIN_60, uv.x * SIN_60 + uv.y * COS_60);
-            float spike60 = exp(-(abs(uv60.x) * spikeWidth + abs(uv60.y) * spikeLength));
-
-            vec2 uvMin60 = vec2(uv.x * COS_60 + uv.y * SIN_60, -uv.x * SIN_60 + uv.y * COS_60);
-            float spikeMin60 = exp(-(abs(uvMin60.x) * spikeWidth + abs(uvMin60.y) * spikeLength));
-
-            float spikeHoriz = exp(-(abs(uv.y) * spikeWidth + abs(uv.x) * (spikeLength * 1.2))) * 0.35;
-
-            float jwstSpikes = (spikeVert + spike60 + spikeMin60 + spikeHoriz);
-            float spikeVisibility = smoothstep(35.0, 80.0, vBaseSize); 
-            
-            intensity += jwstSpikes * spikeVisibility * mix(0.2, 0.45, vIsBlue) * edgeFade * mix(1.0, 2.5, vFlare);
-          }
-
-          if (intensity < 0.002) discard;
-          
-          float twinkle = 0.92 + 0.08 * sin(uTime * 2.5 + vTwinklePhase); 
-          float totalGlow = twinkle + (vFlare * 12.0);
-
-          vec3 physicalExplosionColor = vColor;
-          if (vIsChosen > 0.5) {
-            if (vStarType < 0.5) { physicalExplosionColor = mix(vColor, vec3(0.95, 0.35, 0.05), uFlashProgress); }
-            else if (vStarType < 1.5) { physicalExplosionColor = mix(vColor, vec3(1.0, 0.88, 0.5), uFlashProgress * 0.7); }
-            else { physicalExplosionColor = mix(vColor, vec3(0.3, 0.1, 0.9), uFlashProgress); }
-          }
-
-          vec3 coreWhite = vec3(1.1); 
-          float whiteFactor = mix(0.5, 0.10, isRed * step(vBaseSize, 45.0));
-          float whiteMix = clamp((core * whiteFactor) + superCore + (vFlare * 0.6), 0.0, 0.98);
-          vec3 finalColor = mix(physicalExplosionColor, coreWhite, whiteMix);
-          
-          vec3 alphaColor = mix(finalColor * mix(0.65, 1.0, isRed), finalColor * intensity, edgeFade);
-          
-          float finalAlpha = intensity * mix(0.85, 0.98, vIsBlue) * vFade * edgeFade;
-          gl_FragColor = vec4(alphaColor * totalGlow, finalAlpha);
-        }
-      `
+      vertexColors: true
     });
 
     this.mesh = new THREE.Points(this.geometry, this.material);
