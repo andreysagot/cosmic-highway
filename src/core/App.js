@@ -14,7 +14,9 @@ import { AppConfig } from '../config/AppConfig.js';
 class App {
   constructor() {
     this.engine = new Engine();
-    this.audioManager = new AudioManager();
+    
+    // Inyectamos el callback para cuando se pierda el audio
+    this.audioManager = new AudioManager(() => this.handleAudioLost());
     
     this.uiManager = new UIManager(
       () => this.startAudio(),
@@ -49,23 +51,36 @@ class App {
       smoothedCamRoll: 0.0
     };
 
-    // CACHE VECTORIAL: Evita allocations en el ciclo animate()
     this._v1 = new THREE.Vector3();
     this._v2 = new THREE.Vector3();
 
     this.clock = new THREE.Clock();
+    
+    // Iniciamos el bucle inmediatamente para que sirva de fondo animado
     this.animate = this.animate.bind(this);
-    this.animate();
+    this.animate(); 
   }
 
   async startAudio() {
     const success = await this.audioManager.initAudioCapture();
-    if (success) this.uiManager.markAudioInitialized();
+    if (success) {
+      this.uiManager.markAudioInitialized();
+      
+      // Reiniciamos el reloj para evitar que el delta sea enorme
+      // por el tiempo que el usuario pasó mirando el menú de inicio
+      this.clock.start(); 
+    } else {
+      this.uiManager.showWelcomeScreen();
+    }
   }
 
-  /**
-   * Ejecuta interpolaciones suavizadas (LERP) sobre la posición geométrica de la cámara.
-   */
+  handleAudioLost() {
+    // Cuando perdemos el audio, solo mostramos la UI.
+    // El motor seguirá corriendo en modo "inactivo" (con volumen 0)
+    // gracias a que el AudioManager devuelve valores nulos de forma segura.
+    this.uiManager.showWelcomeScreen();
+  }
+
   updateCamera(audioData) {
     const s = this.state;
     const c = this.camState;
@@ -73,7 +88,7 @@ class App {
     MathUtils.calculatePathGeometry(s.worldTravel + 12, s.timeAccumulator, c.pCenter);
     MathUtils.calculatePathGeometry(s.worldTravel - 70, s.timeAccumulator, c.pCenterAhead);
     
-    const volNorm = audioData.volGeneral * 0.00392156862; // 1/255
+    const volNorm = audioData.volGeneral * 0.00392156862; 
     const lerpFactor = 0.01 + (0.025 * volNorm);
 
     c.smoothedCamHeight += ((9.5 + (volNorm * 14.0)) - c.smoothedCamHeight) * lerpFactor;
@@ -91,9 +106,6 @@ class App {
     this.engine.updateCameraLights(c.currentCamPos, c.currentCamTarget, c.smoothedCamRoll, audioData.bassAvg, audioData.highAvg);
   }
 
-  /**
-   * Core loop de la aplicación. Execution frame a 60hz/120hz.
-   */
   animate() {
     requestAnimationFrame(this.animate);
 
@@ -103,8 +115,10 @@ class App {
     this.state.delta = delta;
     this.state.timeAccumulator = (this.state.timeAccumulator + delta) % 2000.0;
 
+    // Si no hay audio, esto devuelve 0s de forma segura
     const audioData = this.audioManager.update(delta);
 
+    // Si audioData viene en cero (menú de inicio), la velocidad será solo baseSpeed
     const speed = this.state.baseSpeed + audioData.volGeneral * 0.75;
     this.state.distanceStep = speed * delta;
     this.state.worldTravel += this.state.distanceStep;

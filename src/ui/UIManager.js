@@ -4,7 +4,7 @@
  */
 
 import { createIcons } from 'lucide';
-import * as icons from 'lucide'; // Esto importa toda la librería como un objeto 'icons'
+import * as icons from 'lucide';
 
 export class UIManager {
   constructor(onAudioInitRequest, onToggleHighway) {
@@ -15,8 +15,8 @@ export class UIManager {
     this.controls = document.getElementById('controls-container');
 
     if (this.controls) {
-      this.controls.style.opacity = '1'; // Inician visibles
-      this.controls.style.transition = 'opacity 0.5s ease-in-out'; // Transición suave
+      this.controls.style.opacity = '1';
+      this.controls.style.transition = 'opacity 0.5s ease-in-out';
     }
     
     this.wakeLock = null;
@@ -26,14 +26,11 @@ export class UIManager {
     this.hideCursorTimer = null;
     this.onAudioInitRequest = onAudioInitRequest;
     
-    this.onToggleHighway = typeof onToggleHighway === 'function' ? onToggleHighway : () => {
-      console.warn("UIManager: onToggleHighway callback no proporcionado.");
-    };
+    this.onToggleHighway = typeof onToggleHighway === 'function' ? onToggleHighway : () => {};
 
     this.isAudioInitialized = false;
     this.isHighwayEnabled = true;
 
-    // Binding estricto para prevenir memory leaks
     this.handleFullscreenChange = this.handleFullscreenChange.bind(this);
     this.handleMouseMove = this.handleMouseMove.bind(this);
 
@@ -72,7 +69,10 @@ export class UIManager {
     this.isAudioInitialized = true;
     if(this.welcomeOverlay) {
       this.welcomeOverlay.classList.add('hidden');
-      setTimeout(() => this.welcomeOverlay.remove(), 800);
+      // En lugar de remove(), lo ocultamos para poder reutilizarlo
+      setTimeout(() => {
+          this.welcomeOverlay.style.display = 'none';
+      }, 800);
     }
     
     try {
@@ -82,23 +82,40 @@ export class UIManager {
     }
   }
 
+  /**
+   * Restaura la pantalla de inicio si se pierden los permisos de audio
+   */
+  showWelcomeScreen() {
+    this.isAudioInitialized = false;
+    
+    // Restaurar el cursor por si quedó oculto
+    document.documentElement.style.cursor = 'default';
+    
+    if (this.welcomeOverlay) {
+      this.welcomeOverlay.style.display = 'flex'; // Asegura que vuelva al flujo del DOM
+      
+      // Pequeño timeout para permitir que el display:flex se aplique antes de animar opacidad
+      setTimeout(() => {
+        this.welcomeOverlay.classList.remove('hidden');
+      }, 50);
+    }
+
+    // Salir de pantalla completa si estaba activa
+    if (this.isFullscreen()) {
+      if (document.exitFullscreen) document.exitFullscreen();
+      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+    }
+  }
+
   initIcons() {
-    // Renderiza todos los elementos que tengan data-lucide por primera vez
-    createIcons({
-      icons,
-      attrs: { 'stroke-width': 2 }
-    });
+    createIcons({ icons, attrs: { 'stroke-width': 2 } });
   }
 
   updateIcon(element, iconName) {
     const iTag = element.querySelector('i');
     if (iTag) {
       iTag.setAttribute('data-lucide', iconName);
-      // Solo renderizamos el icono específico
-      createIcons({
-        icons,
-        attrs: { 'stroke-width': 2 }
-      });
+      createIcons({ icons, attrs: { 'stroke-width': 2 } });
     }
   }
 
@@ -106,50 +123,37 @@ export class UIManager {
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
   }
 
-  // Solicitar bloqueo de pantalla
   async requestWakeLock() {
     try {
       if ('wakeLock' in navigator) {
         this.wakeLock = await navigator.wakeLock.request('screen');
-        console.log('Wake Lock activo: Pantalla encendida');
       }
     } catch (err) {
-      console.error(`Error al activar Wake Lock: ${err.name}, ${err.message}`);
+      console.error(`Error Wake Lock: ${err.name}`);
     }
   }
 
-  // Liberar bloqueo de pantalla
   async releaseWakeLock() {
     if (this.wakeLock !== null) {
       await this.wakeLock.release();
       this.wakeLock = null;
-      console.log('Wake Lock liberado');
     }
   }
 
   async forceFullscreen() {
     const isCurrentlyFullscreen = this.isFullscreen();
     if (!isCurrentlyFullscreen) {
-      // 1. Intentamos entrar
       try {
         await this.requestWakeLock();
         const docEl = document.documentElement;
-        
         if (docEl.requestFullscreen) await docEl.requestFullscreen();
         else if (docEl.webkitRequestFullscreen) await docEl.webkitRequestFullscreen();
-        
       } catch (err) {
-        // Si falló (por ejemplo, el usuario canceló o el navegador no dejó), 
-        // liberamos el Wake Lock inmediatamente para no dejarlo bloqueado
-        console.error("Fallo al entrar en fullscreen:", err);
         await this.releaseWakeLock();
       }
     } else {
-      // 2. Salimos (esto es más seguro porque exitFullscreen siempre debería funcionar)
       if (document.exitFullscreen) await document.exitFullscreen();
       else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
-      
-      // Liberamos el Wake Lock justo al salir
       await this.releaseWakeLock();
     }
   }
@@ -161,30 +165,20 @@ export class UIManager {
     const span = fsBtn?.querySelector('span');
     const isFS = this.isFullscreen();
 
-    // 1. ELIMINAR el icono viejo (solo si es un SVG de Lucide)
     const oldIcon = fsBtn?.querySelector('svg');
     if (oldIcon) oldIcon.remove();
 
-    // 2. CREAR o REUTILIZAR el elemento <i>
     let iconTag = fsBtn?.querySelector('i');
     if (!iconTag) {
         iconTag = document.createElement('i');
         fsBtn.prepend(iconTag);
     }
     
-    // 3. Asignar el atributo correcto
     iconTag.setAttribute('data-lucide', isFS ? 'shrink' : 'expand');
-    
-    // 4. Restaurar el texto (¡importante!)
     if (span) span.textContent = isFS ? '' : '';
 
-    // 5. Renderizar iconos
-    createIcons({
-      icons, 
-      attrs: { 'stroke-width': 2 }
-    });
+    createIcons({ icons, attrs: { 'stroke-width': 2 } });
     
-    // Si salimos de fullscreen, nos aseguramos de que el cursor sea visible
     if (!isFS) {
         document.documentElement.style.cursor = 'default';
         this.controls.style.opacity = '1';
@@ -194,21 +188,17 @@ export class UIManager {
 
   startCursorHideTimer() {
     const fsEl = document.documentElement;
-    
-    // 1. Siempre mostrar al mover el mouse
-    fsEl.style.cursor = 'default'; // Restaurar cursor
+    fsEl.style.cursor = 'default';
     if (this.controls) {
       this.controls.style.opacity = '1';
       this.controls.style.pointerEvents = 'auto';
     }
     
-    // 2. Limpiar timer previo para evitar conflictos
     clearTimeout(this.hideCursorTimer);
     
-    // 3. Iniciar nuevo ciclo de 2 segundos
     this.hideCursorTimer = setTimeout(() => {
       if (this.isFullscreen()) {
-        fsEl.style.cursor = 'none'; // Ocultar cursor
+        fsEl.style.cursor = 'none';
         if (this.controls) {
           this.controls.style.opacity = '0';
           this.controls.style.pointerEvents = 'none';

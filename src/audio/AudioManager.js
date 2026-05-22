@@ -6,14 +6,15 @@
 import { MathUtils } from '../utils/MathUtils.js';
 
 export class AudioManager {
-  constructor() {
+  constructor(onAudioLostCallback = null) {
     this.audioContext = null;
     this.analyser = null;
     this.dataArray = null;
     this.isAudioInitialized = false;
     this.activeStream = null;
     
-    // Debería importarse de AppConfig, pero lo mantenemos aquí por autonomía
+    this.onAudioLostCallback = onAudioLostCallback;
+    
     this.BANDS_COUNT = 256;
     this.FFT_SIZE = 512;
 
@@ -29,10 +30,6 @@ export class AudioManager {
     this.VISUAL_CONFIG = { noiseGateOn: 0.04, noiseGateOff: 0.02, gravity: 0.5, visualPunch: 0.85 };
   }
 
-  /**
-   * Solicita permisos e inicializa el contexto de audio del navegador.
-   * @returns {Promise<boolean>} Éxito de la inicialización.
-   */
   async initAudioCapture() {
     if (this.isAudioInitialized) return true;
 
@@ -48,6 +45,12 @@ export class AudioManager {
         this.activeStream = await navigator.mediaDevices.getDisplayMedia({ video: { width: 1 }, audio: audioOptions });
       }
 
+      this.activeStream.getTracks().forEach(track => {
+        track.addEventListener('ended', () => {
+          this.handleAudioLost();
+        });
+      });
+
       this.analyser = this.audioContext.createAnalyser();
       this.analyser.fftSize = this.FFT_SIZE;
       this.analyser.smoothingTimeConstant = 0.83;
@@ -60,13 +63,48 @@ export class AudioManager {
       return true;
 
     } catch (err) {
-      console.error("Error al inicializar AudioContext:", err);
-      alert("Permiso denegado: Se requiere acceso al dispositivo de audio.");
+      console.warn("Permiso denegado o error de audio:", err);
+      this.handleAudioLost();
       return false;
     }
   }
 
-  /** @private */
+  /**
+   * Limpia profundamente el contexto para evitar fugas de memoria
+   */
+  handleAudioLost() {
+    this.isAudioInitialized = false;
+    
+    // 1. Detener pistas de hardware
+    if (this.activeStream) {
+      this.activeStream.getTracks().forEach(track => track.stop());
+      this.activeStream = null;
+    }
+
+    // 2. Cerrar contexto de audio
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+
+    // 3. Limpiar buffers
+    this.analyser = null;
+    this.dataArray = null;
+
+    // 4. Resetear bandas
+    for (const key in this.AUDIO_BANDS) {
+        this.AUDIO_BANDS[key].smooth = 0;
+        this.AUDIO_BANDS[key].value = 0;
+        this.AUDIO_BANDS[key].velocity = 0;
+        this.AUDIO_BANDS[key].isOpen = false;
+    }
+
+    // 5. Notificar a App.js
+    if (this.onAudioLostCallback) {
+      this.onAudioLostCallback();
+    }
+  }
+
   freqToIndex(freq) {
     if (!this.audioContext || !this.analyser) return 0;
     const nyquist = this.audioContext.sampleRate * 0.5;
@@ -74,7 +112,6 @@ export class AudioManager {
     return Math.min(Math.max(index, 0), this.analyser.frequencyBinCount - 1);
   }
 
-  /** @private */
   getBandAverage(bandKey) {
     if (!this.dataArray) return 0;
     const band = this.AUDIO_BANDS[bandKey];
@@ -88,7 +125,6 @@ export class AudioManager {
       count++;
     }
     
-    // Multiplicación por inverso es más rápida que división
     const rawAvg = count > 0 ? (sum / count) * 0.00392156862 : 0;
     
     if (band.isOpen) { 
@@ -101,9 +137,6 @@ export class AudioManager {
     return Math.pow(Math.max(0, (rawAvg - this.VISUAL_CONFIG.noiseGateOff) / (1.0 - this.VISUAL_CONFIG.noiseGateOff)), this.VISUAL_CONFIG.visualPunch);
   }
 
-  /**
-   * Actualiza el análisis espectral y procesa la física de las bandas (envolvente ADSR simplificada).
-   */
   update(delta) {
     if (!this.isAudioInitialized || !this.analyser) {
         return { volGeneral: 0, bassAvg: 0, highAvg: 0, isReady: false };
@@ -112,7 +145,6 @@ export class AudioManager {
     this.analyser.getByteFrequencyData(this.dataArray);
     let total = 0;
     
-    // Se procesa la dinámica de fluidos / inercia para cada banda
     for (const key in this.AUDIO_BANDS) {
       const band = this.AUDIO_BANDS[key];
       band.value = this.getBandAverage(key);
