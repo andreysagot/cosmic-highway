@@ -38,16 +38,20 @@ El proyecto sigue un patrón de diseño limpio, separando la lógica de la CPU, 
 │   │   ├── BlackHole.js          # Agujero negro y lente gravitacional
 │   │   └── index.js              # Barril de exportaciones de entidades
 │   ├── shaders/                  # Lógica de renderizado en GPU (GLSL)
-│   │   ├── tunnel.vertex.js      # Deformación de vértices del túnel
-│   │   └── tunnel.fragment.js    # Coloreado y efectos de plasma
+│   │   ├── tunnel.vertex.js      # Vertex shader del túnel
+│   │   ├── tunnel.fragment.js    # Fragment shader del túnel
+│   │   ├── stars.vertex.js       # Vertex shader de estrellas (centelleo)
+│   │   ├── stars.fragment.js     # Fragment shader de estrellas (difracción JWST)
+│   │   ├── blackhole.vertex.js   # Vertex shader del horizonte de eventos
+│   │   └── blackhole.fragment.js # Fragment shader de distorsión gravitacional
 │   ├── ui/
 │   │   └── UIManager.js          # Gestión del DOM, overlays y Fullscreen
 │   ├── utils/
 │   │   └── MathUtils.js          # Funciones de utilidad pura
 │   └── App.js                    # Punto de entrada y orquestador principal
-├── index.html                    # Lienzo DOM y punto de entrada para Vite
-├── style.css                     # Estilos UI / Reset global sin scroll
-└── package.json                  # Dependencias y scripts de empaquetado
+├── index.html                    # Lienzo DOM
+├── style.css                     # Estilos UI
+└── package.json                  # Dependencias y scripts
 
 ```
 
