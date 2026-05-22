@@ -20,6 +20,9 @@ export class UIManager {
     }
     
     this.wakeLock = null;
+    this.initIcons();
+    this.handleFullscreenChange();
+
     this.hideCursorTimer = null;
     this.onAudioInitRequest = onAudioInitRequest;
     
@@ -76,6 +79,26 @@ export class UIManager {
       this.forceFullscreen();
     } catch (e) {
       console.warn("Autoplay fullscreen omitido por el navegador.");
+    }
+  }
+
+  initIcons() {
+    // Renderiza todos los elementos que tengan data-lucide por primera vez
+    createIcons({
+      icons,
+      attrs: { 'stroke-width': 2 }
+    });
+  }
+
+  updateIcon(element, iconName) {
+    const iTag = element.querySelector('i');
+    if (iTag) {
+      iTag.setAttribute('data-lucide', iconName);
+      // Solo renderizamos el icono específico
+      createIcons({
+        icons,
+        attrs: { 'stroke-width': 2 }
+      });
     }
   }
 
@@ -136,24 +159,37 @@ export class UIManager {
 
     const fsBtn = document.getElementById('fs-fallback-btn');
     const span = fsBtn?.querySelector('span');
-    
-    // 1. ELIMINAR el icono viejo para asegurar un render fresco
-    const oldIcon = fsBtn?.querySelector('i, svg');
+    const isFS = this.isFullscreen();
+
+    // 1. ELIMINAR el icono viejo (solo si es un SVG de Lucide)
+    const oldIcon = fsBtn?.querySelector('svg');
     if (oldIcon) oldIcon.remove();
 
-    // 2. CREAR un nuevo elemento <i> para el nuevo icono
-    const newIcon = document.createElement('i');
-    newIcon.setAttribute('data-lucide', this.isFullscreen() ? 'shrink' : 'expand');
-    fsBtn.prepend(newIcon); // Lo ponemos al principio del botón
+    // 2. CREAR o REUTILIZAR el elemento <i>
+    let iconTag = fsBtn?.querySelector('i');
+    if (!iconTag) {
+        iconTag = document.createElement('i');
+        fsBtn.prepend(iconTag);
+    }
+    
+    // 3. Asignar el atributo correcto
+    iconTag.setAttribute('data-lucide', isFS ? 'shrink' : 'expand');
+    
+    // 4. Restaurar el texto (¡importante!)
+    if (span) span.textContent = isFS ? 'Salir' : 'Fullscreen';
 
-    // 3. Actualizar texto
-    if (span) span.textContent = this.isFullscreen() ? '' : '';
-
-    // 4. Renderizar iconos
+    // 5. Renderizar iconos
     createIcons({
-      icons, // El objeto que importamos como * as icons
+      icons, 
       attrs: { 'stroke-width': 2 }
     });
+    
+    // Si salimos de fullscreen, nos aseguramos de que el cursor sea visible
+    if (!isFS) {
+        document.documentElement.style.cursor = 'default';
+        this.controls.style.opacity = '1';
+        this.controls.style.pointerEvents = 'auto';
+    }
   }
 
   startCursorHideTimer() {
