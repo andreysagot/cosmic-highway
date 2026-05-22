@@ -22,12 +22,10 @@ export class UIManager {
     this.wakeLock = null;
     this.initIcons();
     this.handleFullscreenChange();
-
     this.hideCursorTimer = null;
     this.onAudioInitRequest = onAudioInitRequest;
     
     this.onToggleHighway = typeof onToggleHighway === 'function' ? onToggleHighway : () => {};
-
     this.isAudioInitialized = false;
     this.isHighwayEnabled = true;
 
@@ -69,7 +67,6 @@ export class UIManager {
     this.isAudioInitialized = true;
     if(this.welcomeOverlay) {
       this.welcomeOverlay.classList.add('hidden');
-      // En lugar de remove(), lo ocultamos para poder reutilizarlo
       setTimeout(() => {
           this.welcomeOverlay.style.display = 'none';
       }, 800);
@@ -82,25 +79,16 @@ export class UIManager {
     }
   }
 
-  /**
-   * Restaura la pantalla de inicio si se pierden los permisos de audio
-   */
   showWelcomeScreen() {
     this.isAudioInitialized = false;
-    
-    // Restaurar el cursor por si quedó oculto
     document.documentElement.style.cursor = 'default';
-    
     if (this.welcomeOverlay) {
-      this.welcomeOverlay.style.display = 'flex'; // Asegura que vuelva al flujo del DOM
-      
-      // Pequeño timeout para permitir que el display:flex se aplique antes de animar opacidad
+      this.welcomeOverlay.style.display = 'flex';
       setTimeout(() => {
         this.welcomeOverlay.classList.remove('hidden');
       }, 50);
     }
 
-    // Salir de pantalla completa si estaba activa
     if (this.isFullscreen()) {
       if (document.exitFullscreen) document.exitFullscreen();
       else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
@@ -112,10 +100,20 @@ export class UIManager {
   }
 
   updateIcon(element, iconName) {
-    const iTag = element.querySelector('i');
-    if (iTag) {
-      iTag.setAttribute('data-lucide', iconName);
-      createIcons({ icons, attrs: { 'stroke-width': 2 } });
+    const oldSvg = element.querySelector('svg');
+    if (!oldSvg) return;
+
+    const nameKey = iconName.charAt(0).toUpperCase() + iconName.slice(1);
+    const iconData = icons[nameKey];
+
+    if (iconData && iconData[2]) {
+      oldSvg.setAttribute('class', `lucide lucide-${iconName.toLowerCase()}`);
+      oldSvg.setAttribute('data-lucide', iconName.toLowerCase());
+      
+      oldSvg.innerHTML = iconData[2].map(([tag, attrs]) => {
+        const attributes = Object.entries(attrs).map(([k, v]) => `${k}="${v}"`).join(' ');
+        return `<${tag} ${attributes}></${tag}>`;
+      }).join('');
     }
   }
 
@@ -160,25 +158,16 @@ export class UIManager {
 
   handleFullscreenChange() {
     if (!this.controls) return;
-
-    const fsBtn = document.getElementById('fs-fallback-btn');
-    const span = fsBtn?.querySelector('span');
+    
     const isFS = this.isFullscreen();
+    const iconExpand = document.getElementById('icon-expand');
+    const iconShrink = document.getElementById('icon-shrink');
 
-    const oldIcon = fsBtn?.querySelector('svg');
-    if (oldIcon) oldIcon.remove();
-
-    let iconTag = fsBtn?.querySelector('i');
-    if (!iconTag) {
-        iconTag = document.createElement('i');
-        fsBtn.prepend(iconTag);
+    if (iconExpand && iconShrink) {
+        iconExpand.style.display = isFS ? 'none' : 'block';
+        iconShrink.style.display = isFS ? 'block' : 'none';
     }
-    
-    iconTag.setAttribute('data-lucide', isFS ? 'shrink' : 'expand');
-    if (span) span.textContent = isFS ? '' : '';
 
-    createIcons({ icons, attrs: { 'stroke-width': 2 } });
-    
     if (!isFS) {
         document.documentElement.style.cursor = 'default';
         this.controls.style.opacity = '1';

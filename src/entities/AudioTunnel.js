@@ -9,13 +9,7 @@ import { AppConfig } from '../config/AppConfig.js';
 import { TunnelVertexShader } from '../shaders/tunnel.vertex.js';
 import { TunnelFragmentShader } from '../shaders/tunnel.fragment.js';
 
-/**
- * Representa el túnel de partículas reactivo al audio.
- */
 export class AudioTunnel {
-  /**
-   * @param {THREE.Scene} scene - Escena principal de Three.js.
-   */
   constructor(scene) {
     const cfg = AppConfig.tunnel;
     this.bandsCount = AppConfig.audio.bandsCount;
@@ -33,15 +27,19 @@ export class AudioTunnel {
     this.isVisible = true;
     this.smoothedGeneralEnergy = 0.0;
 
+    // Spline variables
+    this.pathSegments = 32;
+    this.pathPoints = [];
+    for(let i = 0; i < this.pathSegments; i++) {
+        this.pathPoints.push(new THREE.Vector3());
+    }
+    this.tempVec3 = new THREE.Vector3();
+
     this.initArrays();
     this.initAudioTexture();
     this.initGeometry(scene);
   }
 
-  /**
-   * Inicializa buffers estáticos en CPU para el cálculo de coeficientes de ponderación de bandas.
-   * @private
-   */
   initArrays() {
     this.laneT = new Float32Array(this.bandsCount);
     this.laneSubW = new Float32Array(this.bandsCount);
@@ -57,14 +55,13 @@ export class AudioTunnel {
     for (let b = 0; b < this.bandsCount; b++) {
       const t = b / (this.bandsCount - 1);
       this.laneT[b] = t;
-
       this.laneSubW[b]  = MathUtils.triWeight(t, 0.04, 0.08);
       this.laneBassW[b] = MathUtils.triWeight(t, 0.12, 0.12);
       this.laneLowW[b]  = MathUtils.triWeight(t, 0.25, 0.16);
       this.laneMidW[b]  = MathUtils.triWeight(t, 0.45, 0.22);
       this.laneHighW[b] = MathUtils.triWeight(t, 0.68, 0.22);
       this.laneAirW[b]  = MathUtils.triWeight(t, 0.90, 0.18);
-
+      
       const rightBias = MathUtils.smoothstep(0.52, 1.0, t);
       this.laneRightBias[b] = rightBias;
       this.laneReactiveGain[b] = 1.0 + rightBias * 0.75;
@@ -72,10 +69,6 @@ export class AudioTunnel {
     }
   }
 
-  /**
-   * Crea la textura de datos RGBA de 1 pixel de alto para mapear la telemetría de audio a la GPU.
-   * @private
-   */
   initAudioTexture() {
     this.audioTextureData = new Uint8Array(this.bandsCount * 4);
     this.audioTexture = new THREE.DataTexture(
@@ -87,11 +80,6 @@ export class AudioTunnel {
     this.audioTexture.needsUpdate = true;
   }
 
-  /**
-   * Genera un mapa procedimental circular liso para simular brillo volumétrico en cada punto.
-   * @private
-   * @returns {THREE.CanvasTexture}
-   */
   generateProceduralTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 64;
@@ -112,11 +100,6 @@ export class AudioTunnel {
     return pTexture;
   }
 
-  /**
-   * Inicializa la geometría e inyecta los atributos personalizados en los WebGL Buffers.
-   * @private
-   * @param {THREE.Scene} scene
-   */
   initGeometry(scene) {
     const positions = new Float32Array(this.totalParticles * 3);
     const aParams1 = new Float32Array(this.totalParticles * 4);
@@ -140,7 +123,7 @@ export class AudioTunnel {
         const idx4 = idx * 4;
 
         positions[idx3]     = Math.cos(angle) * this.tunnelRadius; 
-        positions[idx3 + 1] = Math.sin(angle) * this.tunnelRadius; 
+        positions[idx3 + 1] = Math.sin(angle) * this.tunnelRadius;
         positions[idx3 + 2] = -d * this.roadStep;
 
         aParams1[idx4]     = t;
@@ -170,7 +153,9 @@ export class AudioTunnel {
         uAudioTexture: { value: this.audioTexture },
         uPointTexture: { value: this.generateProceduralTexture() },
         uRoadLength: { value: this.roadLength },
-        uAudioReady: { value: 0.0 }
+        uAudioReady: { value: 0.0 },
+        uPathSpline: { value: this.pathPoints },
+        uPathSegments: { value: this.pathSegments }
       },
       vertexShader: TunnelVertexShader,
       fragmentShader: TunnelFragmentShader,
@@ -186,9 +171,6 @@ export class AudioTunnel {
     scene.add(this.mesh);
   }
 
-  /**
-   * Visibilidad del túnel.
-   */
   toggle(scene, visible) {
     this.isVisible = visible;
     if (this.isVisible) {
@@ -198,21 +180,14 @@ export class AudioTunnel {
     }
   }
 
-  /**
-   * Procesa el espectro de audio FFT y actualiza la textura de datos de GPU.
-   * @param {number} delta - Tiempo transcurrido en segundos.
-   * @param {Object} audioData - Telemetría del AudioManager.
-   */
   processAudioData(delta, audioData) {
     const isPlaying = !!(audioData && audioData.isReady);
-    
-    // OPTIMIZACIÓN CRÍTICA: Precalcular las tasas exponenciales fuera del bucle
     const smoothEnergyRate = 1.0 - Math.exp(-delta * 12.0);
     const transientRiseRate = 1.0 - Math.exp(-delta * 25.0);
     const transientFallRate = 1.0 - Math.exp(-delta * 4.0);
     const tonalRiseRate = 1.0 - Math.exp(-delta * 8.0);
-    const tonalFallRate = 1.0 - Math.exp(-delta * 1.5); 
-
+    const tonalFallRate = 1.0 - Math.exp(-delta * 1.5);
+    
     const subSmooth = isPlaying ? audioData.audioBands.sub.smooth : 0.0;
     const bassSmooth = isPlaying ? audioData.audioBands.bass.smooth : 0.0;
     const lowSmooth = isPlaying ? audioData.audioBands.low.smooth : 0.0;
@@ -223,14 +198,14 @@ export class AudioTunnel {
     for (let i = 0; i < this.bandsCount; i++) {
       let raw = 0.0;
       if (isPlaying && audioData.dataArray) {
-        raw = audioData.dataArray[i] * 0.00392156862; // Equivale a 1/255 optimizado
+        raw = audioData.dataArray[i] * 0.00392156862;
         if (isNaN(raw)) raw = 0.0;
         raw = Math.pow(Math.max(0.0, raw), 1.5); 
       }
       
       const t = this.laneT[i];
       const spectralTilt = 1.0 + Math.pow(t, 1.2) * 1.8;
-      const adjustedRaw = Math.atan(raw * spectralTilt * this.laneReactiveGain[i] * 2.0) * 0.63661977236; // 2/PI
+      const adjustedRaw = Math.atan(raw * spectralTilt * this.laneReactiveGain[i] * 2.0) * 0.63661977236;
 
       const prev = this.smoothedEnergy[i];
       const rise = adjustedRaw > prev ? (adjustedRaw - prev) : (adjustedRaw - prev) * 0.5;
@@ -243,7 +218,7 @@ export class AudioTunnel {
       let rawTonal = subSmooth * this.laneSubW[i] + bassSmooth * this.laneBassW[i] + 
                      lowSmooth * this.laneLowW[i] + midSmooth * this.laneMidW[i] + 
                      highSmooth * this.laneHighW[i] + airSmooth * this.laneAirW[i];
-      
+                     
       rawTonal *= (1.0 + this.laneRightBias[i] * 0.42 + this.laneHighW[i] * 0.16 + this.laneAirW[i] * 0.24);
       const targetTonal = isPlaying ? Math.min(1.0, rawTonal * 0.9 + 0.1) : 0.1; 
 
@@ -257,15 +232,23 @@ export class AudioTunnel {
     this.audioTexture.needsUpdate = true;
   }
 
-  /**
-   * Actualización del frame del túnel.
-   */
   update(state, audioData) {
     if (!this.isVisible) return;
     this.processAudioData(state.delta, audioData);
 
     const targetEnergy = state.generalEnergyFactor || 0.0;
     this.smoothedGeneralEnergy += (targetEnergy - this.smoothedGeneralEnergy) * (1.0 - Math.exp(-state.delta * 3.0));
+
+    // Pre-calcular el Spline en CPU
+    const roadLoopLength = this.roadLength + AppConfig.tunnel.respawnExtra;
+    const roadStartZ = state.worldTravel - this.roadLength;
+    const step = roadLoopLength / (this.pathSegments - 1);
+
+    for (let i = 0; i < this.pathSegments; i++) {
+        const z = roadStartZ + (i * step);
+        MathUtils.calculatePathGeometry(z, state.timeAccumulator, this.tempVec3);
+        this.pathPoints[i].copy(this.tempVec3);
+    }
 
     const uniforms = this.mesh.material.uniforms;
     uniforms.uTime.value = state.timeAccumulator;
@@ -274,5 +257,6 @@ export class AudioTunnel {
     uniforms.uGlobalColorPhase.value = state.globalColorPhase;
     uniforms.uGeneralEnergy.value = this.smoothedGeneralEnergy; 
     uniforms.uAudioReady.value = audioData && audioData.isReady ? 1.0 : 0.0;
+    uniforms.uPathSpline.value = this.pathPoints; // Three.js actualiza el buffer automáticamente
   }
 }
